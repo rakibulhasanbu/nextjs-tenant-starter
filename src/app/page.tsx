@@ -1,7 +1,7 @@
-import { KeyRoundIcon, ShieldCheckIcon, UsersIcon, ZapIcon } from "lucide-react";
-
 import { HeroActions } from "@/features/auth/components/hero-actions";
 import { HeroCodePanel } from "@/features/auth/components/hero-code-panel";
+import { KeyRoundIcon, ShieldCheckIcon, UsersIcon, ZapIcon } from "lucide-react";
+
 import { Text } from "@/components/ui/text";
 
 const features = [
@@ -18,7 +18,8 @@ const features = [
     {
         icon: UsersIcon,
         title: "Role-based access",
-        description: "Admin, super admin, and user roles with a dashboard that adapts to who's signed in.",
+        description:
+            "Every organization gets its own subdomain, roles and members, with a dashboard that adapts to who's signed in.",
     },
     {
         icon: ZapIcon,
@@ -31,10 +32,7 @@ export default function Home() {
     return (
         <main className="flex flex-1 flex-col">
             <section className="relative overflow-hidden">
-                <div
-                    className="pointer-events-none absolute inset-0 bg-grid"
-                    aria-hidden="true"
-                />
+                <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden="true" />
                 <div
                     className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[32rem] w-[64rem] -translate-x-1/2 rounded-full bg-brand/20 blur-3xl"
                     aria-hidden="true"
@@ -73,8 +71,7 @@ export default function Home() {
                             Everything auth, done once
                         </Text>
                         <Text variant="lead" tone="muted" className="mt-3">
-                            A production-shaped foundation so you spend time on your product, not on password
-                            resets.
+                            A production-shaped foundation so you spend time on your product, not on password resets.
                         </Text>
                     </div>
 

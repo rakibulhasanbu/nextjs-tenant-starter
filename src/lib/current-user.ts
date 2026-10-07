@@ -1,17 +1,17 @@
 "server-only";
 
-import { config } from "@/config";
 import { User } from "@/features/auth/types";
 
 import type { ApiSuccessResponse } from "@/lib/api-types";
 import { getAccessTokenCookie, getUserCookie } from "@/lib/auth-cookies";
+import { getServerApiBase } from "@/lib/server-host";
 
 /**
  * `/users/me` — the only endpoint that returns `permissions[]` and `maxRank`
  * alongside the profile, which is what server-side gates check.
  */
 export const fetchMe = async (accessToken: string): Promise<User | null> => {
-    const response = await fetch(`${config.serverUrl}/users/me`, {
+    const response = await fetch(`${await getServerApiBase()}/users/me`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         cache: "no-store",
     });

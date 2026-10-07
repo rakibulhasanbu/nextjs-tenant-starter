@@ -1,13 +1,12 @@
-import { config } from "@/config";
 import { useAuthStore } from "@/store/auth-store";
 
-import { type QueryParams, type ApiErrorResponse, type ApiSuccessResponse, type Method } from "@/lib/api-types";
+import { getClientApiBaseUrl } from "@/lib/api-base";
+import { type ApiErrorResponse, type ApiSuccessResponse, type Method, type QueryParams } from "@/lib/api-types";
 import { toast } from "@/components/ui/toast";
 
 export type { QueryParams } from "@/lib/api-types";
 
 export const API_TIMEOUT = 120_000; // 2 minutes
-export const API_BASE_URL = config.serverUrl;
 
 export const METHOD = {
     POST: "POST",
@@ -42,7 +41,7 @@ type RequestOptions = {
 const buildUrl = (endpoint: string, params?: QueryParams) => {
     // `new URL(endpoint, base)` treats a leading-slash endpoint as absolute and
     // discards the base's own path (e.g. the `/api` in API_BASE_URL) — concatenate instead.
-    const path = `${API_BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
+    const path = `${getClientApiBaseUrl().replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
     const url = new URL(path, typeof window !== "undefined" ? window.location.origin : undefined);
 
     if (params) {

@@ -2,6 +2,20 @@
 
 import { useMemo, useState } from "react";
 
+import { useMe } from "@/features/account/api";
+import { hasPermission, PERMISSIONS } from "@/features/auth/types";
+import { useAdminUsers, useTriggerPasswordResetMutation, useUpdateUserStatusMutation } from "@/features/dashboard/api";
+import { InviteUserDialog } from "@/features/dashboard/components/invite-user-dialog";
+import { UserEditDialog } from "@/features/dashboard/components/user-edit-dialog";
+import { UserSessionsDialog } from "@/features/dashboard/components/user-sessions-dialog";
+import { buildUsersColumns, canActorManage } from "@/features/dashboard/components/users-columns";
+import { AdminUser, MembershipStatus } from "@/features/dashboard/types";
+import { useRoles } from "@/features/roles/api";
+import { useAuthStore } from "@/store/auth-store";
+
+import { ApiError, QueryParams } from "@/lib/api-client";
+import { useAlert } from "@/hooks/use-alert";
+import { toast } from "@/components/ui/toast";
 import {
     DataTable,
     DataTableFacetedFilter,
@@ -10,34 +24,14 @@ import {
     DataTableSearch,
     useDataTableUrlState,
 } from "@/components/table";
-import { useAlert } from "@/hooks/use-alert";
-import { toast } from "@/components/ui/toast";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiError, QueryParams } from "@/lib/api-client";
-import { hasPermission, PERMISSIONS } from "@/features/auth/types";
-import { useMe } from "@/features/account/api";
-import { useRoles } from "@/features/roles/api";
-import { useAuthStore } from "@/store/auth-store";
-import {
-    useAdminUsers,
-    useRestoreAdminUserMutation,
-    useTriggerPasswordResetMutation,
-    useUpdateUserStatusMutation,
-} from "@/features/dashboard/api";
-import { buildUsersColumns, canActorManage } from "@/features/dashboard/components/users-columns";
-import { UserEditDialog } from "@/features/dashboard/components/user-edit-dialog";
-import { UserSessionsDialog } from "@/features/dashboard/components/user-sessions-dialog";
-import { InviteUserDialog } from "@/features/dashboard/components/invite-user-dialog";
-import { AdminUser, UserStatus } from "@/features/dashboard/types";
 
 const statusOptions = [
-    { value: UserStatus.ACTIVE, label: "Active" },
-    { value: UserStatus.PENDING_VERIFICATION, label: "Pending verification" },
-    { value: UserStatus.SUSPENDED, label: "Suspended" },
+    { value: MembershipStatus.ACTIVE, label: "Active" },
+    { value: MembershipStatus.SUSPENDED, label: "Suspended" },
 ];
 
 const UsersTableInner = () => {
-    const { pagination, setPagination, searchTerm, columnFilters } = useDataTableUrlState({ defaultPageSize: 20 });
+    const { pagination, searchTerm, columnFilters } = useDataTableUrlState({ defaultPageSize: 20 });
     const alert = useAlert();
     const actorId = useAuthStore((state) => state.user?.id);
     const { data: me } = useMe();
@@ -47,57 +41,49 @@ const UsersTableInner = () => {
     const canInvite = hasPermission(me?.permissions, PERMISSIONS.USER_INVITE);
     const canAssignRoles = hasPermission(me?.permissions, PERMISSIONS.ROLE_ASSIGN);
 
-    const roleOptions = useMemo(
-        () => (roles ?? []).map((role) => ({ value: role.id, label: role.name })),
-        [roles]
-    );
+    const roleOptions = useMemo(() => (roles ?? []).map((role) => ({ value: role.id, label: role.name })), [roles]);
 
-    const [view, setView] = useState<"active" | "deleted">("active");
     const [editing, setEditing] = useState<AdminUser | null>(null);
     const [viewingSessions, setViewingSessions] = useState<AdminUser | null>(null);
 
-    const handleViewChange = (next: string) => {
-        setView(next as "active" | "deleted");
-        setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-    };
-
     const params = useMemo<QueryParams>(() => {
         const roleId = columnFilters.find((f) => f.id === "roleIds")?.value;
-        const status = columnFilters.find((f) => f.id === "status")?.value;
+        const status = columnFilters.find((f) => f.id === "membershipStatus")?.value;
         return {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
             search: searchTerm || undefined,
             // The backend's list query is a strictObject keyed on `roleId` — `role` would 400.
             roleId: Array.isArray(roleId) ? roleId[0] : roleId,
-            status: view === "deleted" ? undefined : Array.isArray(status) ? status[0] : status,
-            deleted: view === "deleted" ? "true" : undefined,
+            status: Array.isArray(status) ? status[0] : status,
         };
-    }, [pagination, searchTerm, columnFilters, view]);
+    }, [pagination, searchTerm, columnFilters]);
 
     const { data, isLoading } = useAdminUsers(params);
 
     const updateStatus = useUpdateUserStatusMutation();
     const triggerReset = useTriggerPasswordResetMutation();
-    const restore = useRestoreAdminUserMutation();
 
     const handleToggleStatus = (user: AdminUser) => {
-        const nextStatus = user.status === UserStatus.ACTIVE ? UserStatus.SUSPENDED : UserStatus.ACTIVE;
+        const nextStatus =
+            user.membershipStatus === MembershipStatus.ACTIVE ? MembershipStatus.SUSPENDED : MembershipStatus.ACTIVE;
         alert.fire({
-            title: nextStatus === UserStatus.SUSPENDED ? "Suspend this user?" : "Reactivate this user?",
+            title: nextStatus === MembershipStatus.SUSPENDED ? "Suspend this user?" : "Reactivate this user?",
             text:
-                nextStatus === UserStatus.SUSPENDED
-                    ? "They'll be signed out everywhere and unable to log back in."
+                nextStatus === MembershipStatus.SUSPENDED
+                    ? "They'll lose access to this organization immediately. Their other organizations aren't affected."
                     : undefined,
             confirmButtonOptions: {
-                variant: nextStatus === UserStatus.SUSPENDED ? "destructive" : "default",
-                text: nextStatus === UserStatus.SUSPENDED ? "Suspend" : "Reactivate",
+                variant: nextStatus === MembershipStatus.SUSPENDED ? "destructive" : "default",
+                text: nextStatus === MembershipStatus.SUSPENDED ? "Suspend" : "Reactivate",
             },
             showCancelButton: true,
             onConfirm: async () => {
                 try {
                     await updateStatus.mutateAsync({ id: user.id, status: nextStatus });
-                    toast.add({ title: nextStatus === UserStatus.SUSPENDED ? "User suspended" : "User reactivated" });
+                    toast.add({
+                        title: nextStatus === MembershipStatus.SUSPENDED ? "User suspended" : "User reactivated",
+                    });
                 } catch (error) {
                     toast.add({
                         title: "Update failed",
@@ -122,42 +108,28 @@ const UsersTableInner = () => {
         });
     };
 
-    const handleRestore = async (user: AdminUser) => {
-        await restore.mutateAsync(user.id);
-        toast.add({ title: "User restored" });
-    };
-
     const columns = useMemo(
         () =>
             buildUsersColumns({
-                view,
                 canManage: (user) => canActorManage(actorId, user),
+                canEditRoles: canAssignRoles,
                 onEdit: setEditing,
                 onToggleStatus: handleToggleStatus,
                 onViewSessions: setViewingSessions,
                 onResetPassword: handleResetPassword,
-                onRestore: handleRestore,
             }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [actorId, view]
+        [actorId, canAssignRoles]
     );
 
     return (
         <DataTableProvider data={data?.data} columns={columns} rowCount={data?.meta?.total} getRowId={(row) => row.id}>
-            <Tabs value={view} onValueChange={handleViewChange}>
-                <TabsList>
-                    <TabsTrigger value="active">Active</TabsTrigger>
-                    <TabsTrigger value="deleted">Deleted</TabsTrigger>
-                </TabsList>
-            </Tabs>
             <DataTableHeader
                 filters={
                     <>
                         <DataTableSearch placeholder="Search by name, email, username..." />
                         <DataTableFacetedFilter columnId="roleIds" title="Role" options={roleOptions} />
-                        {view === "active" && (
-                            <DataTableFacetedFilter columnId="status" title="Status" options={statusOptions} />
-                        )}
+                        <DataTableFacetedFilter columnId="membershipStatus" title="Status" options={statusOptions} />
                     </>
                 }
                 actions={canInvite ? <InviteUserDialog /> : undefined}
@@ -166,13 +138,9 @@ const UsersTableInner = () => {
                 isLoading={isLoading}
                 emptyTitle="No users found"
                 emptyDescription="Try adjusting your search or filters."
-                onRowClick={(user) => (canActorManage(actorId, user) ? setEditing(user) : undefined)}
+                onRowClick={(user) => (canAssignRoles && canActorManage(actorId, user) ? setEditing(user) : undefined)}
             />
-            <UserEditDialog
-                user={editing}
-                canEditRoles={canAssignRoles}
-                onOpenChange={(open) => !open && setEditing(null)}
-            />
+            <UserEditDialog user={editing} onOpenChange={(open) => !open && setEditing(null)} />
             <UserSessionsDialog user={viewingSessions} onOpenChange={(open) => !open && setViewingSessions(null)} />
         </DataTableProvider>
     );

@@ -1,11 +1,12 @@
 import { UserProfile } from "@/features/auth/types";
 
-export enum UserStatus {
-    PENDING_VERIFICATION = "PENDING_VERIFICATION",
+/** A member's standing in the *current organization* — the account itself is global and not editable here. */
+export enum MembershipStatus {
     ACTIVE = "ACTIVE",
     SUSPENDED = "SUSPENDED",
 }
 
+/** A member of the current organization: the global account plus this tenant's roles and membership state. */
 export interface AdminUser {
     id: string;
     email: string;
@@ -15,13 +16,10 @@ export interface AdminUser {
     avatarUrl: string | null;
     roleIds: string[];
     profile: UserProfile | null;
-    status: UserStatus;
+    membershipStatus: MembershipStatus;
     emailVerifiedAt: string | null;
     /** False for Google-only accounts: offer set-password, not change-password. */
     hasPassword: boolean;
-    failedLoginAttempts: number;
-    lockedUntil: string | null;
-    deletedAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -37,13 +35,4 @@ export interface AdminUserSession {
     lastUsedAt: string;
     expiresAt: string;
     revokedAt: string | null;
-}
-
-/** Request body for `PATCH /admin/users/:id` — roles are excluded by design, they have their own endpoint. */
-export interface AdminUpdateUserPayload {
-    email?: string;
-    name?: string;
-    username?: string;
-    phone?: string;
-    avatarUrl?: string;
 }

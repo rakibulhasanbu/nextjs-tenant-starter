@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { hasPermission, PERMISSIONS } from "@/features/auth/types";
+import { canViewDashboard as hasDashboardAccess, hasPermission, PERMISSIONS } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
 import { LayoutDashboardIcon, LogOutIcon, MenuIcon, SettingsIcon, UserIcon } from "lucide-react";
 
@@ -40,9 +40,17 @@ export const SiteNavbar = () => {
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    if (pathname?.startsWith("/dashboard") || pathname?.startsWith("/auth")) return null;
+    if (
+        ["/dashboard", "/platform", "/auth", "/register", "/accept-invite"].some((prefix) =>
+            pathname?.startsWith(prefix)
+        )
+    ) {
+        return null;
+    }
 
-    const canViewDashboard = hasPermission(user?.permissions, PERMISSIONS.USER_READ_ANY);
+    // The console is the super admin's home; everyone else gets the organization dashboard if they hold any admin permission.
+    const isPlatformAdmin = hasPermission(user?.permissions, PERMISSIONS.PLATFORM_TENANT_READ);
+    const canViewDashboard = !isPlatformAdmin && hasDashboardAccess(user?.permissions);
     const displayName = user ? user.name || user.username : "";
 
     const handleSignOut = async () => {
@@ -78,6 +86,12 @@ export const SiteNavbar = () => {
                                     </DropdownMenuLabel>
                                 </DropdownMenuGroup>
                                 <DropdownMenuSeparator />
+                                {isPlatformAdmin && (
+                                    <DropdownMenuItem render={<Link href="/platform" />}>
+                                        <LayoutDashboardIcon />
+                                        Console
+                                    </DropdownMenuItem>
+                                )}
                                 {canViewDashboard && (
                                     <DropdownMenuItem render={<Link href="/dashboard" />}>
                                         <LayoutDashboardIcon />
@@ -146,6 +160,17 @@ export const SiteNavbar = () => {
                                     </div>
                                 </div>
 
+                                {isPlatformAdmin && (
+                                    <LinkButton
+                                        href="/platform"
+                                        variant="ghost"
+                                        className="justify-start"
+                                        onClick={() => setMobileOpen(false)}
+                                    >
+                                        <LayoutDashboardIcon data-icon="inline-start" />
+                                        Console
+                                    </LinkButton>
+                                )}
                                 {canViewDashboard && (
                                     <LinkButton
                                         href="/dashboard"

@@ -4,39 +4,53 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { loginAction } from "@/features/auth/actions";
+import { TenantPicker } from "@/features/auth/components/tenant-picker";
+import { useSessionOutcome } from "@/features/auth/hooks/use-session-outcome";
 import { signInFormSchema, SignInFormValues } from "@/features/auth/schemas";
-import { useAuthStore } from "@/store/auth-store";
+import { SelectableTenant } from "@/features/auth/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
+import type { HostKind } from "@/lib/host";
 import { FieldGroup } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { FormInput } from "@/components/shared/form-input";
 import { LinkButton } from "@/components/shared/link-button";
 import { LoadingButton } from "@/components/shared/loading-button";
 
-export const SignInForm = () => {
-    const setTokens = useAuthStore((state) => state.setTokens);
-    const setUser = useAuthStore((state) => state.setUser);
+type SignInFormProps = {
+    /** Only the apex has no subdomain to say which organization to enter, so only it asks. */
+    hostKind: HostKind;
+};
+
+export const SignInForm = ({ hostKind }: SignInFormProps) => {
+    const finishSession = useSessionOutcome();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selection, setSelection] = useState<{ selectionToken: string; tenants: SelectableTenant[] } | null>(null);
+
+    const callbackUrl = searchParams.get("callbackUrl") || "/";
 
     const { control, handleSubmit } = useForm<SignInFormValues>({
         resolver: zodResolver(signInFormSchema),
-        defaultValues: { email: "", password: "" },
+        defaultValues: { email: "", password: "", tenantSlug: "" },
     });
 
     const onSubmit = handleSubmit(async (values) => {
         setIsSubmitting(true);
-        const result = await loginAction(values.email, values.password);
+        const result = await loginAction(values.email, values.password, values.tenantSlug);
         setIsSubmitting(false);
 
         if (result.status === "twoFactorRequired") {
-            const callbackUrl = searchParams.get("callbackUrl");
             const params = new URLSearchParams({ twoFactorToken: result.twoFactorToken });
-            if (callbackUrl) params.set("callbackUrl", callbackUrl);
+            if (searchParams.get("callbackUrl")) params.set("callbackUrl", callbackUrl);
             router.push(`/auth/2fa-verify?${params.toString()}`);
+            return;
+        }
+
+        if (result.status === "tenantSelection") {
+            setSelection({ selectionToken: result.selectionToken, tenants: result.tenants });
             return;
         }
 
@@ -57,27 +71,35 @@ export const SignInForm = () => {
 
             if (result.code === "EMAIL_NOT_VERIFIED") {
                 toast.add({ title: "Verify your email", description: "We sent you a new code.", type: "info" });
-                const callbackUrl = searchParams.get("callbackUrl");
                 const params = new URLSearchParams({ email: values.email });
-                if (callbackUrl) params.set("callbackUrl", callbackUrl);
+                if (searchParams.get("callbackUrl")) params.set("callbackUrl", callbackUrl);
+                if (values.tenantSlug) params.set("tenant", values.tenantSlug);
                 router.push(`/auth/verify-email?${params.toString()}`);
                 return;
             }
-            toast.add({ title: "Sign in failed", description: result.error, type: "error" });
-            return;
         }
 
-        setTokens({ accessToken: result.data.accessToken, refreshToken: result.data.refreshToken });
-        setUser(result.data.user);
-
-        const callbackUrl = searchParams.get("callbackUrl") || "/";
-        router.replace(callbackUrl);
-        router.refresh();
+        finishSession(result, { callbackUrl });
     });
+
+    if (selection) {
+        return <TenantPicker {...selection} callbackUrl={callbackUrl} />;
+    }
 
     return (
         <form onSubmit={onSubmit} noValidate>
             <FieldGroup>
+                {hostKind === "apex" && (
+                    <FormInput
+                        control={control}
+                        name="tenantSlug"
+                        type="text"
+                        label="Organization"
+                        placeholder="acme (optional)"
+                        description="Leave empty to pick from your organizations."
+                        autoComplete="organization"
+                    />
+                )}
                 <FormInput
                     control={control}
                     name="email"

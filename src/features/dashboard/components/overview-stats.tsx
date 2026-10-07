@@ -1,13 +1,13 @@
 "use client";
 
+import { ROLE_IDS } from "@/features/auth/types";
+import { useAdminUsersCount } from "@/features/dashboard/api";
+import { MembershipStatus } from "@/features/dashboard/types";
 import { ShieldCheckIcon, UserCheckIcon, UserIcon, UserXIcon } from "lucide-react";
 
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Text } from "@/components/ui/text";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAdminUsersCount } from "@/features/dashboard/api";
-import { UserStatus } from "@/features/dashboard/types";
-import { ROLE_IDS } from "@/features/auth/types";
+import { Text } from "@/components/ui/text";
 
 type StatCardProps = {
     label: string;
@@ -39,25 +39,23 @@ const StatCard = ({ label, value, isLoading, icon }: StatCardProps) => (
 /** No stats/analytics endpoint exists yet — counts are derived cheaply from `.total` on 1-row admin/users pages. */
 export const OverviewStats = () => {
     const total = useAdminUsersCount();
-    const active = useAdminUsersCount({ status: UserStatus.ACTIVE });
-    const pending = useAdminUsersCount({ status: UserStatus.PENDING_VERIFICATION });
-    const suspended = useAdminUsersCount({ status: UserStatus.SUSPENDED });
+    const active = useAdminUsersCount({ status: MembershipStatus.ACTIVE });
+    const suspended = useAdminUsersCount({ status: MembershipStatus.SUSPENDED });
     const admins = useAdminUsersCount({ roleId: ROLE_IDS.ADMIN });
 
     return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Total users" value={total.data?.meta?.total} isLoading={total.isLoading} icon={<UserIcon />} />
+            <StatCard
+                label="Total users"
+                value={total.data?.meta?.total}
+                isLoading={total.isLoading}
+                icon={<UserIcon />}
+            />
             <StatCard
                 label="Active"
                 value={active.data?.meta?.total}
                 isLoading={active.isLoading}
                 icon={<UserCheckIcon />}
-            />
-            <StatCard
-                label="Pending verification"
-                value={pending.data?.meta?.total}
-                isLoading={pending.isLoading}
-                icon={<UserXIcon />}
             />
             <StatCard
                 label="Suspended"

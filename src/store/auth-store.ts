@@ -1,5 +1,5 @@
 import { logoutAction, revalidateTokensAction } from "@/features/auth/actions";
-import { User } from "@/features/auth/types";
+import { SessionTenant, User } from "@/features/auth/types";
 import { create } from "zustand";
 import { createJSONStorage, persist, StateStorage } from "zustand/middleware";
 
@@ -13,6 +13,8 @@ const noopStorage: StateStorage = {
 
 type AuthState = {
     user: User | null;
+    /** The organization this session acts in; `null` on the platform host. */
+    tenant: SessionTenant | null;
 
     state: "loading" | "success"; // TODO: Rethink about this
 
@@ -22,6 +24,7 @@ type AuthState = {
 
 type AuthActions = {
     setUser: (user: User) => void;
+    setTenant: (tenant: SessionTenant | null) => void;
     setTokens: (tokens: { accessToken: string; refreshToken: string }) => void;
     setState: (state: AuthState["state"]) => void;
     setTokensAndRevalidate: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
@@ -31,6 +34,7 @@ type AuthActions = {
 
 const initialState: AuthState = {
     user: null,
+    tenant: null,
     state: "loading",
     accessToken: null,
     refreshToken: null,
@@ -42,6 +46,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             ...initialState,
 
             setUser: (user) => set({ user, state: "success" }),
+
+            setTenant: (tenant) => set({ tenant }),
 
             setTokens: (tokens) => set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }),
 
@@ -57,7 +63,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
             logout: async () => {
                 await logoutAction();
-                set({ user: null, accessToken: null, refreshToken: null });
+                set({ user: null, tenant: null, accessToken: null, refreshToken: null });
             },
 
             logoutWithReload: async () => {
@@ -72,6 +78,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 accessToken: state.accessToken,
                 refreshToken: state.refreshToken,
                 user: state.user,
+                tenant: state.tenant,
             }),
         }
     )

@@ -36,3 +36,14 @@ Zustand stores are not colocated in the feature folder — see `src/store/` belo
 - No SSR prefetch/hydration (`HydrationBoundary`) scaffolding yet — add it when a feature first needs server-fetched, hydrated data.
 
 - follow Component Decomposition convention.
+
+## Multi-tenancy (mirrors the backend's `context/architecture.md`)
+
+- Three host kinds, parsed by `lib/host.ts` (same rules as the backend): **apex** (`<root>`, `www`, reserved labels), **tenant** (`<slug>.<root>`), **platform** (`admin.<root>`, super admin only). Env: `NEXT_PUBLIC_ROOT_DOMAIN`, `NEXT_PUBLIC_PLATFORM_SUBDOMAIN`, `NEXT_PUBLIC_SERVER_URL` (API apex origin).
+- The API resolves the tenant from the request **host**, so the web mirrors its page host onto the API origin (`lib/api-base.ts`: `acme.localhost:3001` → `acme.localhost:3000`). Client: `getClientApiBaseUrl()`; server actions/RSC: `getServerApiBase()` (`lib/server-host.ts`). Never hardcode `NEXT_PUBLIC_SERVER_URL` in a request.
+- Sessions are per host (host-scoped cookies + per-origin localStorage). The apex never keeps a session: sign-in there trades its token for a one-time code (`switch-tenant`) and redirects to `<tenant url>/auth/exchange?code=` (`features/auth/actions.ts` → `completeLogin`). Org switcher uses the same path.
+- Auth-shaped server actions return a `SessionOutcome` (`success` | `redirect` | `signInRequired`) or an error; client code funnels them through `useSessionOutcome` (`features/auth/hooks`), which also routes tenant-state error codes (`TENANT_PENDING_APPROVAL`, `TENANT_REJECTED`, `TENANT_SUSPENDED`, `MEMBERSHIP_SUSPENDED`, `NOT_A_MEMBER`, `NO_ORGANIZATION`) to `/auth/organization-status`.
+- `proxy.ts` is host-aware: apex = landing/sign-up/register/sign-in (no dashboards), tenant = `/dashboard` + `/account`, platform = `/platform` + `/account`. Open on every host: `/auth/exchange`, `/auth/organization-status`, `/accept-invite`.
+- Gate UI on permission keys (`features/auth/types.ts` mirrors the backend catalog). Dashboard nav items carry their own permission (`features/dashboard/nav-config.ts`). Tenant admins manage *memberships* only — identity is global (no edit/restore of accounts).
+- Features: `tenant` (org settings, switcher, create org), `tenant-requests` (public config + request form, `ADMIN_ONLY` mode), `audit` (tenant + platform trail), `platform` (super admin console).
+- Backend `.env` for local dev (web :3001, API :3000): `TENANT_URL_TEMPLATE=http://{slug}.localhost:3001`, `CORS_ORIGINS=http://localhost:3001`. Browsers resolve `*.localhost` with no DNS.

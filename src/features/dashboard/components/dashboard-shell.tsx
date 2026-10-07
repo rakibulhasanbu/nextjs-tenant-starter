@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { dashboardNavItems } from "@/features/dashboard/nav-config";
+import { allowedDashboardNavItems } from "@/features/dashboard/nav-config";
+import { platformNavItems } from "@/features/platform/nav-config";
+import { OrgSwitcher } from "@/features/tenant/components/org-switcher";
 import { useAuthStore } from "@/store/auth-store";
 import { LogOutIcon } from "lucide-react";
 
@@ -25,7 +27,13 @@ import {
 import { Text } from "@/components/ui/text";
 import { Logo } from "@/components/shared/logo";
 
-export const DashboardShell = ({ children }: { children: React.ReactNode }) => {
+type DashboardShellProps = {
+    children: React.ReactNode;
+    /** `platform` is the super admin console: its own nav, and no organization to switch between. */
+    variant?: "tenant" | "platform";
+};
+
+export const DashboardShell = ({ children, variant = "tenant" }: DashboardShellProps) => {
     const pathname = usePathname();
     const user = useAuthStore((state) => state.user);
     const logoutWithReload = useAuthStore((state) => state.logoutWithReload);
@@ -40,7 +48,10 @@ export const DashboardShell = ({ children }: { children: React.ReactNode }) => {
                     <SidebarGroup>
                         <SidebarGroupContent>
                             <SidebarMenu>
-                                {dashboardNavItems.map((item) => {
+                                {(variant === "platform"
+                                    ? platformNavItems
+                                    : allowedDashboardNavItems(user?.permissions)
+                                ).map((item) => {
                                     const isActive = pathname === item.url || pathname.startsWith(`${item.url}/`);
                                     const Icon = item.icon;
                                     return (
@@ -76,6 +87,7 @@ export const DashboardShell = ({ children }: { children: React.ReactNode }) => {
             <SidebarInset>
                 <header className="flex items-center gap-2 border-b px-4 py-3">
                     <SidebarTrigger />
+                    {variant === "tenant" && <OrgSwitcher />}
                 </header>
                 <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6">{children}</div>
             </SidebarInset>

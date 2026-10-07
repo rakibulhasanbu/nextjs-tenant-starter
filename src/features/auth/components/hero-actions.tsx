@@ -1,6 +1,6 @@
 "use client";
 
-import { hasPermission, PERMISSIONS } from "@/features/auth/types";
+import { canViewDashboard as hasDashboardAccess } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
 import { ArrowRightIcon } from "lucide-react";
 
@@ -12,7 +12,7 @@ export const HeroActions = () => {
 
     if (user) {
         const displayName = user.name || user.username;
-        const canViewDashboard = hasPermission(user.permissions, PERMISSIONS.USER_READ_ANY);
+        const canViewDashboard = hasDashboardAccess(user.permissions);
 
         return (
             <div className="flex flex-col items-start gap-4">
@@ -34,7 +34,7 @@ export const HeroActions = () => {
     return (
         <div className="flex flex-wrap items-center gap-3">
             <LinkButton href="/auth/sign-up" size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90">
-                Get started
+                Create your organization
                 <ArrowRightIcon />
             </LinkButton>
             <LinkButton href="/auth/sign-in" variant="outline" size="lg">

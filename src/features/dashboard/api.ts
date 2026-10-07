@@ -1,7 +1,7 @@
+import { AdminUser, AdminUserSession, MembershipStatus } from "@/features/dashboard/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch, apiFetchPaginated, QueryParams } from "@/lib/api-client";
-import { AdminUpdateUserPayload, AdminUser, AdminUserSession, UserStatus } from "@/features/dashboard/types";
 
 export const adminUsersKeys = {
     all: ["admin-users"] as const,
@@ -17,8 +17,7 @@ export const useAdminUsers = (params: QueryParams) =>
     });
 
 /** Cheap way to derive a count without an aggregate endpoint: read `.total` from a 1-row page. */
-export const useAdminUsersCount = (params: QueryParams = {}) =>
-    useAdminUsers({ ...params, page: 1, limit: 1 });
+export const useAdminUsersCount = (params: QueryParams = {}) => useAdminUsers({ ...params, page: 1, limit: 1 });
 
 export const useAdminUser = (id: string) =>
     useQuery({
@@ -42,18 +41,9 @@ const useInvalidateAdminUsers = () => {
     };
 };
 
-export const useUpdateAdminUserMutation = (id: string) => {
-    const invalidate = useInvalidateAdminUsers();
-    return useMutation({
-        mutationFn: (data: AdminUpdateUserPayload) =>
-            apiFetch<AdminUser>(`/admin/users/${id}`, { method: "PATCH", body: data }),
-        onSuccess: () => invalidate(id),
-    });
-};
-
 /**
- * Roles are deliberately not editable through `PATCH /admin/users/:id` — they
- * sit behind their own `role:assign` permission and their own endpoint, which
+ * Identity is global, so a tenant admin can't edit the account itself — only the
+ * member's roles, behind their own `role:assign` permission and endpoint, which
  * replaces the whole set (the backend always re-adds the baseline `user` role).
  */
 export const useAssignUserRolesMutation = (id: string) => {
@@ -68,17 +58,9 @@ export const useAssignUserRolesMutation = (id: string) => {
 export const useUpdateUserStatusMutation = () => {
     const invalidate = useInvalidateAdminUsers();
     return useMutation({
-        mutationFn: ({ id, status }: { id: string; status: UserStatus }) =>
+        mutationFn: ({ id, status }: { id: string; status: MembershipStatus }) =>
             apiFetch<AdminUser>(`/admin/users/${id}/status`, { method: "PATCH", body: { status } }),
         onSuccess: (_data, vars) => invalidate(vars.id),
-    });
-};
-
-export const useRestoreAdminUserMutation = () => {
-    const invalidate = useInvalidateAdminUsers();
-    return useMutation({
-        mutationFn: (id: string) => apiFetch<AdminUser>(`/admin/users/${id}/restore`, { method: "POST" }),
-        onSuccess: (_data, id) => invalidate(id),
     });
 };
 
@@ -105,8 +87,8 @@ export const useRevokeAllAdminUserSessionsMutation = (userId: string) => {
 };
 
 /**
- * Creates the account and emails a password-reset code — completing that reset
- * is what both sets a real password and proves the invitee owns the address.
+ * Adds the invitee to this organization: a new address gets an account plus a
+ * password-reset code email, an existing account is simply added as a member.
  * The backend always re-adds the baseline `user` role, so `roleIds` only needs
  * to carry the elevated role, if any.
  */

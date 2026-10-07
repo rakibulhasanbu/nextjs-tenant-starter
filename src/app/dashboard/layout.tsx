@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { hasPermission, PERMISSIONS } from "@/features/auth/types";
+import { canViewDashboard } from "@/features/auth/types";
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
 
 import { getCurrentUser } from "@/lib/current-user";
@@ -15,8 +15,8 @@ import { getCurrentUser } from "@/lib/current-user";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
     const user = await getCurrentUser();
 
-    if (!user || !hasPermission(user.permissions, PERMISSIONS.USER_READ_ANY)) {
-        redirect("/");
+    if (!user || !canViewDashboard(user.permissions)) {
+        redirect("/account");
     }
 
     return <DashboardShell>{children}</DashboardShell>;
